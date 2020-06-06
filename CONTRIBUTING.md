@@ -2,7 +2,7 @@
 
 Some of the things that I'd love for people to help with:
 
-- Improve performance of existing code (but not at the cost of readability) – I realise that most optimisation projects in python use `cvxopt` rather than `scipy.optimize`, but the latter is far cleaner and much more readable. If it transpires that performance differs by orders of magnitude, I will definitely consider switching.
+- Improve performance of existing code (but not at the cost of readability) – are there any nice numpy hacks I've missed?
 - Add new optimisation objectives. For example, if you think that the best performance metric has not been included, write an optimiser! (or suggest it in [Issues](https://github.com/robertmartin8/PyPortfolioOpt/issues) and I will have a go).
 - Help me write more tests! If you are someone learning about quant finance and/or unit testing in python, what better way to practice than to write some tests on an open-source project! Feel free to check for edge cases, or test performance on a dataset with more stocks.
 
@@ -30,7 +30,7 @@ I would appreciate if changes are accompanied by relevant documentation – it d
 
 If you have any questions related to the project, it is probably easiest to [raise an issue](https://github.com/robertmartin8/PyPortfolioOpt/issues), and I will tag it as a question.
 
-If you have questions unrelated to the project, drop me an email – contact details can be found on my [website](https://reasonabledeviations.science/about/)
+If you have questions unrelated to the project, drop me an email – contact details can be found on my [website](https://reasonabledeviations.com/about/)
 
 ## Bugs/issues
 

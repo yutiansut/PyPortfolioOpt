@@ -8,12 +8,20 @@ This is designed to be a practical guide, mostly aimed at users who are interest
 quick way of optimally combining some assets (most likely equities). However, when
 necessary I do introduce the required theory and also point out areas that may be
 suitable springboards for more advanced optimisation techniques. Details about the
-parameters are left for the respective documentation pages (please see the sidebar).
+parameters can be found in the respective documentation pages (please see the sidebar).
+
+For this guide, we will be focusing on mean-variance optimisation (MVO), which is what
+most people think of when they hear "portfolio optimisation". MVO forms the core of
+PyPortfolioOpt's offering, though it should be noted that MVO comes in many flavours,
+which can have very different performance characteristics. Please refer to the sidebar
+to get a feeling for the possibilities, as well as the other optimisation methods
+offered. But for now, we will continue with the Efficient Frontier.
 
 PyPortfolioOpt is designed with modularity in mind; the below flowchart sums up the
 current functionality and overall layout of PyPortfolioOpt.
 
-.. image:: ../media/conceptual_flowchart_v1-grey.png
+.. image:: ../media/conceptual_flowchart_v2-grey.png
+    :alt: Conceptual flowchart for the PyPortfolioOpt library
 
 Processing historical prices
 ============================
@@ -51,9 +59,7 @@ between the available methods for estimating expected returns and the covariance
 Sensible defaults are :py:func:`expected_returns.mean_historical_return()` and
 the Ledoit Wolf shrinkage estimate of the covariance matrix found in
 :py:class:`risk_models.CovarianceShrinkage`. It is simply a matter of applying the
-relevant functions to the price dataset:
-
-.. code:: python
+relevant functions to the price dataset::
 
     from pypfopt.expected_returns import mean_historical_return
     from pypfopt.risk_models import CovarianceShrinkage
@@ -81,9 +87,9 @@ actual portfolio optimisation.
 Efficient Frontier Optimisation
 ===============================
 
-Efficient Frontier Optimisation is based on Harry Markowitz's 1952 classic [1]_, which
-turned  portfolio management into a science. The key insight is that by combining
-assets with different expected returns and volatilities, one can decide on a
+Efficient Frontier Optimisation is based on Harry Markowitz's 1952 classic paper [1]_, which
+turned portfolio management from an art into a science. The key insight is that by
+combining assets with different expected returns and volatilities, one can decide on a
 mathematically optimal allocation.
 
 If :math:`w` is the weight vector of stocks with expected returns :math:`\mu`, then the
@@ -111,6 +117,7 @@ portfolio) – the set of all these optimal portfolios is referred to as the
 
 .. image:: ../media/efficient_frontier.png
    :align: center
+   :alt: risk-return characteristics of possible portfolios 
 
 Each dot on this diagram represents a different possible portfolio, with darker blue
 corresponding to 'better' portfolios (in terms of the Sharpe Ratio). The dotted
@@ -128,10 +135,7 @@ risk. So in practice, rather than trying to minimise volatility for a given targ
 return (as per Markowitz 1952), it often makes more sense to just find the portfolio
 that maximises the Sharpe ratio. This is implemented as the :py:meth:`max_sharpe`
 method in the  :py:class:`EfficientFrontier` class. Using the series ``mu`` and
-dataframe ``S`` from before:
-
-
-.. code:: python
+dataframe ``S`` from before::
 
     from pypfopt.efficient_frontier import EfficientFrontier
 
@@ -141,11 +145,10 @@ dataframe ``S`` from before:
 If you print these weights, you will get quite an ugly result, because they will
 be the raw output from the optimiser. As such, it is recommended that you use
 the :py:meth:`clean_weights` method, which truncates tiny weights to zero
-and rounds the rest.
-
-.. code:: python
+and rounds the rest::
 
     cleaned_weights = ef.clean_weights()
+    ef.save_weights_to_file("weights.txt")  # saves to file
     print(cleaned_weights)
 
 This prints::
@@ -173,9 +176,7 @@ This prints::
 
 
 If we want to know the expected performance of the portfolio with optimal
-weights ``w``, we can use the :py:meth:`portfolio_performance` method:
-
-.. code:: python
+weights ``w``, we can use the :py:meth:`portfolio_performance` method::
 
     ef.portfolio_performance(verbose=True)
 
@@ -212,42 +213,93 @@ From experience, I have found that efficient frontier optimisation often sets ma
 of the asset weights to be zero. This may not be ideal if you need to have a certain
 number of positions in your portfolio, for diversification purposes or otherwise.
 
-To combat this, I have introduced an experimental feature, which borrows the idea of
+To combat this, I have introduced an objective function which borrows the idea of
 regularisation from machine learning. Essentially, by adding an additional cost
 function to the objective, you can 'encourage' the optimiser to choose different
 weights (mathematical details are provided in the :ref:`L2-Regularisation` section).
 To use this feature, change the ``gamma`` parameter::
 
-    ef = EfficientFrontier(mu, S, gamma=1)
-    ef.max_sharpe()
+    ef = EfficientFrontier(mu, S)
+    ef.add_objective(objective_functions.L2_reg, gamma=0.1)
+    w = ef.max_sharpe()
     print(ef.clean_weights())
 
 The result of this has far fewer negligible weights than before::
 
-    {'GOOG': 0.05664,
-    'AAPL': 0.087,
-    'FB': 0.1591,
-    'BABA': 0.09784,
-    'AMZN': 0.06986,
+    {'GOOG': 0.06366,
+    'AAPL': 0.09947,
+    'FB': 0.15742,
+    'BABA': 0.08701,
+    'AMZN': 0.09454,
     'GE': 0.0,
     'AMD': 0.0,
-    'WMT': 0.03649,
+    'WMT': 0.01766,
     'BAC': 0.0,
     'GM': 0.0,
-    'T': 0.02204,
+    'T': 0.00398,
     'UAA': 0.0,
     'SHLD': 0.0,
-    'XOM': 0.04812,
-    'RRC': 0.0045,
-    'BBY': 0.06389,
-    'MA': 0.16382,
-    'PFE': 0.1358,
+    'XOM': 0.03072,
+    'RRC': 0.00737,
+    'BBY': 0.07572,
+    'MA': 0.1769,
+    'PFE': 0.12346,
     'JPM': 0.0,
-    'SBUX': 0.05489}
+    'SBUX': 0.06209}
+
+Post-processing weights
+-----------------------
+
+In practice, we then need to convert these weights into an actual allocation,
+telling you how many shares of each asset you should purchase. This is discussed
+further in :ref:`post-processing`, but we provide an example below::
+
+    from pypfopt.discrete_allocation import DiscreteAllocation, get_latest_prices
+
+    latest_prices = get_latest_prices(df)
+    da = DiscreteAllocation(w, latest_prices, total_portfolio_value=20000)
+    allocation, leftover = da.lp_portfolio()
+    print(allocation)
+
+These are the quantities of shares that should be bought to have a $20,000 portfolio::
+
+    {'AAPL': 2.0,
+    'FB': 12.0,
+    'BABA': 14.0,
+    'GE': 18.0,
+    'WMT': 40.0,
+    'GM': 58.0,
+    'T': 97.0,
+    'SHLD': 1.0,
+    'XOM': 47.0,
+    'RRC': 3.0,
+    'BBY': 1.0,
+    'PFE': 47.0,
+    'SBUX': 5.0}
+
+
+Improving performance
+=====================
+
+Let's say you have conducted backtests and the results aren't spectacular. What
+should you try?
+
+- Try the Hierarchical Risk Parity model (see :ref:`other-optimisers`) – which seems
+  to robustly outperform mean-variance optimisation out of sample.
+- Use the Black-Litterman model to construct a more stable model of expected returns.
+  Alternatively, just drop the expected returns altogether!. There is a large body of research
+  that suggests that minimum variance portfolios (``ef.min_volatility()``) consistently outperform
+  maximum Sharpe ratio portfolios out-of-sample, because of the difficulty of forecasting expected returns.
+- Try different risk models: different asset classes may require different risk models.
+- Add some new objective terms or constraints. Tune the L2 regularisation parameter to see how diversification
+  affects the performance.
 
 This concludes the guided tour. Head over to the appropriate sections
 in the sidebar to learn more about the parameters and theoretical details of the
-different functionality offered by PyPortfolioOpt.
+different models offered by PyPortfolioOpt. If you have any questions, please
+raise an issue on GitHub and I will try to respond promptly.
+
+If you'd like even more examples, check out the cookbook `recipe <https://github.com/robertmartin8/PyPortfolioOpt/blob/master/cookbook/2-Mean-Variance-Optimisation.ipynb>`_.
 
 
 References
